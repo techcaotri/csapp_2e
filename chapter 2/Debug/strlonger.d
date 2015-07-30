@@ -1,0 +1,1 @@
+strlonger.d: ../strlonger.c
