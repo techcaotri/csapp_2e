@@ -1,0 +1,15 @@
+A:
+	+ e1.p: offset 0
+	+ e1.y: offset 4
+	+ e2.x: offset 0
+	+ e2.next: offset 4
+
+B. union ele takes up 8 bytes since each structure e1, e2 takes up 8 bytes
+C.
+	up at %ebp+8
+1 movl 8(%ebp), %edx	; edx = up
+2 movl 4(%edx), %ecx	; ecx = up->e1.y or up->e2.next
+3 movl (%ecx), %eax		; eax = up->e2.next->e1.p	=> ecx = up->e2.next
+4 movl (%eax), %eax		; eax = *(up->e2.next->e1.p)
+5 subl (%edx), %eax		; eax = eax - up->e2.x = *(up->e2.next->e1.p) - up->e2.x
+6 movl %eax, 4(%ecx)	; up->e2.next->e1.y = eax
