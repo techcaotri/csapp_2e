@@ -1,0 +1,35 @@
+typedef struct ELE *tree_ptr;
+struct ELE {
+	long val;
+	tree_ptr left;
+	tree_ptr right;
+};
+
+long traverse(tree_ptr tp);
+
+1 traverse:
+	tp in %rdi
+2 movq %rbx, -24(%rsp)						; store rbx
+3 movq %rbp, -16(%rsp)						; store rbp
+4 movq %r12, -8(%rsp)						; store r12
+5 subq $24, %rsp							; allocate stack space for local variables and function arguments
+6 movq %rdi, %rbp							; rbp = rdi = tp
+7 movabsq $-9223372036854775808, %rax		; rax =  -0x8000000000000000 = INT_MIN_64
+8 testq %rdi, %rdi							; Check rdi == NULL
+9 je .L9									; jump to return if rdi == NULL
+10 movq (%rdi), %rbx						; rbx = *tp = tp->val
+11 movq 8(%rdi), %rdi						; rdi = tp->left
+12 call traverse							; traverse(rdi) = traverse(tp->left)
+13 movq %rax, %r12							; r12 = rax = return value of traverse(tp->left)
+14 movq 16(%rbp), %rdi						; rdi = tp->right
+15 call traverse							; traverse(tp->right); rax = return value of traverse(tp->right)
+16 cmpq %rax, %r12							; compare r12 and rax (r12 - rax)
+17 cmovge %r12, %rax  						; if r12 >= rax, move r12 to rax
+18 cmpq %rbx, %rax 							; compare rax and rbx (rax - rbx)
+19 cmovl %rbx, %rax							; if rax < rbx, move rbx to rax
+20 .L9:										; return
+21 movq (%rsp), %rbx						; restore rbx
+22 movq 8(%rsp), %rbp						; restore rbp
+23 movq 16(%rsp), %r12						; restore r12
+24 addq $24, %rsp							; deallocate stack space
+25 ret
