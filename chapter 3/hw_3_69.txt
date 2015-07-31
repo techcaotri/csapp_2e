@@ -1,0 +1,22 @@
+typedef struct ELE *tree_ptr;
+struct ELE {
+	long val;
+	tree_ptr left;
+	tree_ptr right;
+};
+
+long trace(tree_ptr tp);
+
+1 trace:
+		tp in %rdi
+2 movl $0, %eax				; 
+3 testq %rdi, %rdi			; check tp != NULL
+4 je .L3					; jump to done if tp == NULL
+5 .L5:						; loop
+6 movq (%rdi), %rax			; rax = *tp = tp->val
+7 movq 16(%rdi), %rdi		; rdi = tp->right
+8 testq %rdi, %rdi			; check rdi = tp != NULL
+9 jne .L5					; jump to loop if tp != NULL
+10 .L3:						; done
+11 rep
+12 ret
