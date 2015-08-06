@@ -1,0 +1,6 @@
+\begin{alltt}
+   0:   68 ef cd ab 89          push   $0x89abcdef{\em\scriptsize }
+   5:   83 c0 11                add    $0x11,%eax{\em\scriptsize }
+   8:   98                      cwtl                {\em\scriptsize  Objdump tries to interpret}
+   9:   ba dc fe 00 00          mov    $0xfedc,%edx {\em\scriptsize  these as instructions}
+\end{alltt}

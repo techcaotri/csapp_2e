@@ -1,0 +1,27 @@
+#####################################################################
+# CS:APP Buffer Lab
+#
+# Buffer bomb source files
+#
+# Copyright (c) 2003, R. Bryant and D. O'Hallaron, All rights reserved.
+# May not be used, modified, or copied without permission.
+#
+######################################################################
+
+config.h: 
+	Site-specific constants associated with email notifications.
+
+bufbomb.c (bufbomb):  
+	A bomb program that is solved using a buffer overflow attack.
+
+sendstring.c (sendstring): 
+	Converts a text string into raw bytes and emits it on stdout.
+
+makecookie.c and gencookie.c (makecookie):
+	Generates and emits the cookie associated with a team name.
+
+getopt.c: 
+	An implementation of getopt for systems such as older versions 
+	of Cygwin.
+
+

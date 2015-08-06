@@ -1,0 +1,20 @@
+\begin{alltt}
+{\scriptsize   1} void test()
+{\scriptsize   2} \verb:{:
+{\scriptsize   3}     int val;
+{\scriptsize   4}     volatile int local = 0xdeadbeef;
+{\scriptsize   5}     entry_check(3);  /* Make sure entered this function properly */
+{\scriptsize   6}     val = getbuf();
+{\scriptsize   7}     /* Check for corrupted stack */
+{\scriptsize   8}     if (local != 0xdeadbeef) \verb:{:
+{\scriptsize   9}         printf("Sabotaged!: the stack has been corrupted\verb:\n:");
+{\scriptsize  10}     \verb:}:
+{\scriptsize  11}     else if (val == cookie) \verb:{:
+{\scriptsize  12}         printf("Boom!: getbuf returned 0x%x\verb:\n:", val);
+{\scriptsize  13}         validate(3);
+{\scriptsize  14}     \verb:}:
+{\scriptsize  15}     else \verb:{:
+{\scriptsize  16}         printf("Dud: getbuf returned 0x%x\verb:\n:", val);
+{\scriptsize  17}     \verb:}:
+{\scriptsize  18} \verb:}:
+\end{alltt}

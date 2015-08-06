@@ -1,0 +1,122 @@
+#####################################################################
+# CS:APP Buffer Lab
+# Directions to Instructors
+#
+# Copyright (c) 2002, R. Bryant and D. O'Hallaron, All rights reserved.
+# May not be used, modified, or copied without permission.
+#
+######################################################################
+
+This directory contains the files that you will use to build and run
+the CS:APP Buffer Lab. 
+
+The purpose of the Buffer Lab is to help students develop a detailed
+understanding of the stack discipline on IA32 processors.  It involves
+applying a series of buffer overflow attacks on an executable file.
+
+***********
+1. Overview
+***********
+
+A "buffer bomb" is a binary bomb that is solved using a buffer
+overflow attack (exploit).  In this lab, students are asked to to
+alter the behavior of a buffer bomb (called bufbomb) via five
+increasingly difficult levels of exploits.
+
+The levels are called smoke, fizz, bang, boom, and kaboom, with smoke
+(level 0) being the simplest, and kaboom (level 4) being the most
+difficult. Each exploit involves reading a sequence of bytes from
+standard input into a buffer stored on the stack.
+
+The solution to the buffer bomb is a function of the team name.  Thus,
+students must develop the solution on their own and cannot use the
+solutions from other teams.
+
+Buffer bombs send the results of each run to an email spool file.
+An autograding daemon continuously scans the spool file and updates
+a cute Web status page with the most recent results for each student.
+
+********
+2. Files
+********
+
+Makefile	- Cleans and builds the entire lab
+README		- This file
+buflab-handout/ - The files that are handed out to the students
+grade/		- Autograding daemons and scripts
+src/		- The buffer bomb source files and binaries
+solve/		- A script solves the buffer bomb for any team name
+writeup/	- Sample Latex lab writeup
+
+**************************
+3. Building the Buffer Lab
+**************************
+
+Step 1. Modify the configuration files:
+
+You will need to modify the following two configuration files:
+
+i) src/config.h:
+
+Like the binary bomb, the bufbomb program can be configured in
+config.h so that it automatically sends email notifications to an
+email spool file each time the student runs the bufbomb program. The
+src/config.h file controls whether or not this notification will occur
+(NOTIFY), along with location of the spool file (BOMB_USER and
+BOMB_HOST) and the location of the sendmail program (SENDMAIL).
+
+The config.h file also assigns a unique generation number
+(BOMB_GENERATION) to each buffer bomb, so that the autograders won't
+get confused by old submissions from previous terms. It's also handy
+for testing new autograders.
+
+ii) grade/config.pm
+
+This file defines constants that are used by the autograding
+scripts. These include the pathname of the mail spool file
+($MAILFILE), the bomb generation number ($BOMB_GENERATION), and the
+lab title that will be displayed on the status Web page.
+
+
+Step 2: Build the buffer bomb
+
+Once you have updated the configuration files, modify the Latex lab
+writeup in ./writeup/buflab.tex for your environment. Then type the
+following in the current directory:
+
+	unix> make clean
+	unix> make 
+
+The Makefile generates the buffer bomb and some helper programs in the
+src/ directory, formats the lab writeup, and then copies all the files
+that the students will need to the buflab-handout directory.  Finally,
+it builds a tarfile of the handout directory (in buflab-handout.tar)
+that you can hand out to students.  The command:
+
+	unix> make dist DEST=<DIR>
+
+will copy the tarfile and copies of the writeup to directory <DIR>,
+where the students can access it.
+
+*************************
+4. Grading the Buffer Lab
+*************************
+
+The scripts for updating status on a Web page and grading the
+solutions are in ./grade. From the ./grade directory, you can start
+the autograding daemon by typing
+
+	unix> make start
+
+To kill the daemon, type
+
+	unix> make stop
+
+To produce a grade sheet, type
+
+	unix> make grades
+
+
+
+
+

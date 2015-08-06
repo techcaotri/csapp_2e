@@ -1,0 +1,587 @@
+\documentclass[11pt]{article}
+
+\usepackage{times}
+\usepackage{alltt}
+
+
+%% Page layout
+\oddsidemargin 0pt
+\evensidemargin 0pt
+\textheight 600pt
+\textwidth 469pt
+\setlength{\parindent}{0em}
+\setlength{\parskip}{1ex}
+
+%% ccode environment- for displaying formatted C code (c2tex) 
+\newenvironment{ccode}%
+{\small}%
+{}
+
+%% tty - for displaying TTY input and output
+\newenvironment{tty}%
+{\small\begin{alltt}}%
+{\end{alltt}}
+
+\begin{document}
+
+\title{CS 213, Fall 2002\\
+Lab Assignment L3: The Buffer Bomb\\
+Assigned: Sep.~26, Due: Thurs., Oct.~3, 11:59PM
+}
+
+\author{}
+\date{}
+
+\maketitle
+
+Randy Bryant ({\tt Randy.Bryant@cs.cmu.edu}) is the lead person for
+this assignment.
+
+\section*{Introduction}
+
+This assignment helps you develop a detailed understanding of the
+calling stack organization on an IA32 processor.  It involves applying
+a series of {\em buffer overflow attacks} on an executable file {\tt
+bufbomb} in the lab directory.
+
+{\bf Note:} In this lab, you will gain firsthand experience with one
+of the methods commonly used to exploit security weaknesses in
+operating systems and network servers.  Our purpose is to help you
+learn about the runtime operation of programs and to understand the
+nature of this form of security weakness so that you can avoid it
+when you write system code.  We do not condone the use of these or any other
+form of attack to gain unauthorized access to any system resources.
+There are criminal statutes governing such activities.
+
+\section*{Logistics}
+
+You may work in a group of up to two people in solving the problems
+for this assignment.  The only ``hand-in'' will be an automated
+logging of your successful attacks.  Any clarifications and revisions
+to the assignment will be posted on the course Web page.
+
+\section*{Hand Out Instructions}
+
+\begin{quote}
+\bf SITE-SPECIFIC: Insert a paragraph here that explains how the instructor
+will hand out the \texttt{buflab-handout.tar} file to the students. 
+\end{quote}
+
+Start by copying \texttt{buflab-handout.tar} to a (protected) directory
+in which you plan to do your work.  Then give the command
+``\verb@tar xvf buflab-handout.tar@''.  This will cause a number of files
+to be unpacked in the directory:
+\begin{description}
+\item[{\sc makecookie}:] Generates a ``cookie'' based on your team name.
+\item[{\sc bufbomb}:] The code you will attack.
+\item[{\sc sendstring}:] A utility to help convert between string formats.
+\end{description}
+All of these programs are compiled to run on Linux machines.
+
+In the following instructions, we will assume that you have copied the three
+programs to a protected local directory, and that you are executing them in
+that local directory.
+
+
+\section*{Team Name and Cookie}
+
+\begin{quote}
+NOTE TO INSTRUCTORS: In this section, we are assuming that students
+have a unique login ID. At our school this is called an ``Andrew ID.''
+You will want to replace this with something appropriate for your
+school, such as ``login name.''
+\end{quote}
+
+You should create a team name for the one or two people in your group
+of the following form:
+\begin{itemize}
+\item ``${\it ID}$'' where ${\it ID}$ is your Andrew ID, if you are
+working alone, or
+\item ``${\it ID}_1${\tt +}${\it ID}_2$'' where ${\it ID}_1$ is the
+Andrew ID of the first team member and ${\it ID}_2$ is the Andrew ID
+of the second team member.  
+\end{itemize}
+You should choose a consistent ordering of the IDs in the second form
+of team name.  Teams ``{\tt ac00+bovik}'' and ``{\tt bovik+ac00}'' are
+considered distinct.  {\bf You must follow this scheme for generating
+your team name.  Our grading program will only give credit to those
+people whose Andrew IDs can be extracted from the team names.}
+
+A {\em cookie} is a string of eight hexadecimal digits that is (with high
+probability) unique to your team.  You can generate your cookie with
+the {\tt makecookie} program giving your team name as the argument.
+For example:
+\begin{tty}
+unix>{\em ./makecookie ac00+bovik}
+0x78327b66
+\end{tty}
+In four of your five buffer attacks, your objective will be to make
+your cookie show up in places where it ordinarily would not.
+
+\section*{The {\sc Bufbomb} Program}
+
+The {\sc bufbomb} program reads a string from standard input with a
+function {\tt getbuf} having the following C code:
+
+\begin{ccode}
+\input{getbuf-c}
+\end{ccode}
+
+The function {\tt Gets} is similar to the standard library function
+{\tt gets}---it reads a string from standard input (terminated by
+`\verb@\n@' or end-of-file) and stores it (along with a null
+terminator) at the specified destination.  In this code, the
+destination is an array {\tt buf} having sufficient space for 12
+characters.
+
+Neither {\tt Gets} nor {\tt gets} has any way to determine whether
+there is enough space at the destination to store the entire string.
+Instead, they simply copy the entire string, possibly overrunning the
+bounds of the storage allocated at the destination.
+
+If the string typed by the user to {\tt getbuf} is no more than 11
+characters long, it is clear that {\tt getbuf} will return 1, as shown
+by the following execution example:
+
+\begin{tty}
+unix>{\em ./bufbomb}
+Type string:{\em howdy doody}
+Dud: getbuf returned 0x1
+\end{tty}
+
+Typically an error occurs if we type a longer string:
+
+\begin{tty}
+unix>{\em ./bufbomb}
+Type string:{\em This string is too long}
+Ouch!: You caused a segmentation fault!
+\end{tty}
+
+As the error message indicates, overrunning the buffer typically
+causes the program state to be corrupted, leading to a memory access
+error.  Your task is to be more clever with the strings you feed {\sc
+bufbomb} so that it does more interesting things.  These are called
+{\em exploit} strings.
+
+{\sc Bufbomb} takes several different command line arguments:
+\begin{description}
+\item[{\tt -t} {\it TEAM}:] Operate the bomb for the indicated team.
+You should always provide this argument for several reasons:
+\begin{itemize}
+\item It is required to log your successful attacks.
+
+\item {\sc Bufbomb} determines the cookie you will be using based on
+your team name, just as does the program {\sc makecookie}.
+
+\item
+We have built features into {\sc bufbomb} so that some of the key
+stack addresses you will need to use depend on your team's cookie.
+\end{itemize}
+\item[{\tt -h}:] Print list of possible command line arguments
+\item[{\tt -n}:] Operate in ``Nitro'' mode, as is used in Level 4 below.
+\end{description}
+
+Your exploit strings will typically contain byte values that do not
+correspond to the ASCII values for printing characters.  The program
+{\sc sendstring} can help you generate these {\em raw} strings.  It
+takes as input a {\em hex-formatted} string.  In this format, each
+byte value is represented by two hex digits.  For example, the string
+``{\tt 012345}'' could be entered in hex format as ``{\tt 30 31 32 33
+34 35}.'' (Recall that the ASCII code for decimal digit $x$ is {\tt 0x3}$x$.)
+Non-hex digit characters are ignored, including the blanks in the
+example shown.
+
+If you generate a hex-formatted exploit string in the file {\tt
+exploit.txt}, you can apply the raw string to {\sc bufbomb} in several
+different ways:
+\begin{enumerate}
+\item You can set up a series of pipes to pass the string through {\sc sendstring}.
+\begin{tty}
+unix>{\em cat exploit.txt | ./sendstring | ./bufbomb -t bovik}
+\end{tty}
+\item
+You can store the raw string in a file and use I/O redirection to supply it to {\sc bufbomb}:
+\begin{tty}
+unix>{\em ./sendstring < exploit.txt > exploit-raw.txt}
+unix>{\em ./bufbomb -t bovik < exploit-raw.txt}
+\end{tty}
+This approach can also be used when running {\sc bufbomb} from within
+{\sc gdb}:
+\begin{tty}
+unix>{\em gdb bufbomb}
+(gdb){\em run -t bovik < exploit-raw.txt}
+\end{tty}
+\end{enumerate}
+
+One important point: your exploit string must not contain byte value
+{\tt 0x0A} at any intermediate position,
+since this is the ASCII code for newline (`\verb@\n@').
+When {\tt Gets} encounters this byte, it will assume you intended to
+terminate the string.  {\sc Sendstring} will warn you if it encounters
+this byte value.
+
+When you correctly solve one of the levels, {\sc bufbomb}
+will automatically send an email notification to our grading server.
+The server will test your exploit string to make sure it really works,
+and it will update the lab web page indicating that your team (listed
+by cookie) has completed this level.
+
+Unlike the bomb lab, there is no penalty for making mistakes in this
+lab.  Feel free to fire away at {\sc bufbomb} with any string you
+like.
+
+\section*{Level 0: Candle (10 pts)}
+
+The function {\tt getbuf} is called within {\sc bufbomb} by a function
+{\tt test} having the following C code:
+
+\begin{ccode}
+\input boom-c
+\end{ccode}
+
+When {\tt getbuf} executes its return statement (line 5 of {\tt
+getbuf}), the program ordinarily resumes execution within function
+{\tt test} (at line 8 of this function).
+Within the file {\tt bufbomb}, there is a function {\tt smoke} having
+the following C code:
+
+\begin{ccode}
+\input smoke-c
+\end{ccode}
+
+Your task is to get {\sc bufbomb} to execute the code for {\tt smoke}
+when {\tt getbuf} executes its return statement, rather than returning
+to {\tt test}.  You can do this by supplying an exploit string that
+overwrites the stored return pointer in the stack frame for {\tt
+getbuf} with the address of the first instruction in {\tt smoke}.
+Note that your exploit string may also corrupt other parts of the
+stack state, but this will not cause a problem, since {\tt smoke}
+causes the program to exit directly.
+
+{\bf Some Advice}:
+\begin{itemize}
+\item All the information you need to devise your exploit
+string for this level can be determined by examining a diassembled
+version of {\sc bufbomb}.
+\item
+Be careful about byte ordering.  
+\item
+You might
+want to use {\sc gdb} to step the program through the last few
+instructions of {\tt getbuf} to make sure it is doing the right thing.
+\item
+The placement of {\tt buf} within the stack frame for {\tt getbuf}
+depends on which version of {\sc gcc} was used to compile {\tt
+bufbomb}.  You will need to pad the beginning of your exploit string
+with the proper number of bytes to overwrite the return pointer.  The
+values of these bytes can be arbitrary.
+\end{itemize}
+
+\section*{Level 1: Sparkler (20 pts)}
+
+Within the file {\tt bufbomb} there is also a function {\tt fizz}
+having the following C code:
+
+\begin{ccode}
+\input fizz-c
+\end{ccode}
+
+Similar to Level 0, your task is to get {\sc bufbomb} to execute the
+code for {\tt fizz} rather than returning to {\tt test}.  In this
+case, however, you must make it appear to {\tt fizz} as if you have
+passed your cookie as its argument.  You can do this by encoding your
+cookie in the appropropriate place within your exploit string.
+
+{\bf Some Advice}: 
+\begin{itemize}
+\item Note that the program won't really call {\tt
+fizz}---it will simply execute its code.  This has important
+implications for where on the stack you want to place your
+cookie.
+\end{itemize}
+
+\section*{Level 2: Firecracker (30 pts)}
+
+A much more sophisticated form of buffer attack involves supplying a string
+that encodes actual machine instructions.  The exploit string then
+overwrites the return pointer with the starting address of these instructions.
+When the calling function (in this case {\tt getbuf}) executes its {\tt
+ret} instruction, the program will start executing the instructions on
+the stack rather than returning.  With this form of attack, you can get
+the program to do almost anything.  The code you place on the stack is
+called the {\em exploit} code.  This style of attack is tricky,
+though, because you must get machine code onto the stack and set the
+return pointer to the start of this code.
+
+Within the file {\tt bufbomb} there is a function {\tt bang}
+having the following C code:
+
+\begin{ccode}
+\input bang-c
+\end{ccode}
+
+Similar to Levels 0 and 1, your task is to get {\sc bufbomb} to
+ execute the code for {\tt bang} rather than returning to {\tt test}.
+ Before this, however, you must set global variable
+ \verb@global_value@ to your team's cookie.  Your exploit code should
+ set \verb@global_value@, push the address of \texttt{bang} on the
+ stack, and then execute a \texttt{ret} instruction to cause a jump to
+ the code for \texttt{bang}.
+
+{\bf Some Advice}:
+\begin{itemize}
+\item 
+You can use {\sc gdb} to get the information you need to construct
+your exploit string.  Set a breakpoint within {\tt getbuf} and run to
+this breakpoint.  Determine parameters such as the address of \verb@global_value@ and the location of the buffer.
+\item
+Determining the byte encoding of instruction sequences by hand is
+tedious and prone to errors.  You can let tools do all of the work by
+writing an assembly code file containing the instructions and data you
+want to put on the stack.  Assemble this file with {\sc gcc} and
+disassemble it with {\sc objdump}.  You should be able to get the
+exact byte sequence that you will type at the prompt.  
+(A brief example of how to do this is included at the end of this writeup.)
+\item
+Keep in mind that your exploit string depends on your machine, your
+compiler, and even your team's cookie.  Do all of your work on a Fish
+machine, and make sure you include the proper team name on the command line
+to {\sc bufbomb}.
+\item
+Our solution requires 16 bytes of exploit code.  Fortunately, there is
+sufficient space on the stack, because we can overwrite the stored
+value of \verb@%ebp@.  This stack corruption will not cause any
+problems, since \texttt{bang} causes the program to exit directly.
+\item
+Watch your use of address modes when writing assembly code.
+Note that \verb@movl $0x4, %eax@ moves the {\em value} \texttt{0x00000004}
+into register \verb@%eax@; whereas \verb@movl 0x4, %eax@ moves the value
+{\em at} memory location \texttt{0x00000004} into \verb@%eax@. Since that
+memory location is usually undefined, the second instruction will cause a
+segfault!
+\item
+Do not attempt to use either a \texttt{jmp} or a \texttt{call}
+instruction to jump to the code for \texttt{bang}.  These instructions
+uses PC-relative addressing, which is very tricky to set up correctly.
+Instead, push an address on the stack and use the \texttt{ret}
+instruction.
+\end{itemize}
+
+
+\section*{Level 3: Dynamite (40 pts)}
+
+Our preceding attacks have all caused the program to jump to the code
+for some other function, which then causes the program to exit.  As a
+result, it was acceptable to use exploit strings that corrupt the
+stack, overwriting the saved value of register \verb@%ebp@ and the
+return pointer.  
+
+The most sophisticated form of buffer overflow attack causes the
+program to execute some exploit code that patches up the stack and
+makes the program return to the original calling function
+(\texttt{test} in this case).  The calling function is oblivious to
+the attack.  This style of attack is tricky, though, since you must:
+1) get machine code onto the stack, 2) set the return pointer to the
+start of this code, and 3) undo the corruptions made to the stack
+state.
+
+Your job for this level is to supply an exploit string that will cause
+{\tt getbuf} to return your cookie back to \texttt{test}, rather than
+the value 1.  You can see in the code for {\tt test} that this will
+cause the program to go ``{\tt Boom!}.''  Your exploit code should set
+your cookie as the return value, restore any corrupted state, push the
+correct return location on the stack, and execute a {\tt ret}
+instruction to really return to {\tt test}.
+
+{\bf Some Advice}:
+\begin{itemize}
+\item In order to overwrite the return pointer, you must also
+overwrite the saved value of \verb@%ebp@.  However, it is important
+that this value is correctly restored before you return to {\tt test}.
+You can do this by either 1) making sure that your exploit string
+contains the correct value of the saved \verb@%ebp@ in the correct
+position, so that it never gets corrupted, or 2) restore the correct
+value as part of your exploit code.  You'll see that the code for
+\texttt{test} has some explicit tests to check for a corrupted stack.
+\item 
+You can use {\sc gdb} to get the information you need to construct
+your exploit string.  Set a breakpoint within {\tt getbuf} and run to
+this breakpoint.  Determine parameters such as the saved return
+address and the saved value of \verb@%ebp@.
+\item
+Again, let tools such as \textsc{gcc} and \textsc{objdump} do all of
+the work of generating a byte encoding of the instructions.
+\item
+Keep in mind that your exploit string depends on your machine, your
+compiler, and even your team's cookie.  Do all of your work on a Fish
+machine, and make sure you include the proper team name on the command line
+to {\sc bufbomb}.
+\end{itemize}
+
+Once you complete this level, pause to reflect on what you have
+accomplished.  You caused a program to execute machine code of your
+own design.  You have done so in a sufficiently stealthy way that the program
+did not realize that anything was amiss.
+
+\section*{Level 4: Nitroglycerin (10 pts)}
+
+If you have completed the first four levels, you have earned 100
+points.  You have mastered the principles of the runtime stack
+operation, and you have gained firsthand experience with buffer
+overflow attacks.  We consider this a satisfactory mastery of the
+material.  You are welcome to stop right now.
+
+The next level is for those who want to push themselves beyond our
+baseline expectations for the course, and who want to face a challenge
+in designing buffer overflow attacks that arises in real life.  This
+part of the assignment only counts 10 points, even though it requires
+a fair amount of work to do, so don't do it just for the points.
+
+From one run to another, especially by different users, the exact
+stack positions used by a given procedure will vary.  One reason for
+this variation is that the values of all environment variables are
+placed near the base of the stack when a program starts executing.
+Environment variables are stored as strings, requiring different
+amounts of storage depending on their values.  Thus, the stack space
+allocated for a given user depends on the settings of his or her
+environment variables.  Stack positions also differ when running a
+program under {\sc gdb}, since {\sc gdb} uses stack space for some of its
+own state.
+
+In the code that calls {\tt getbuf}, we have incorporated features
+that stabilize the stack, so that the position of {\tt getbuf}'s stack
+frame will be consistent between runs.  This made it possible for you
+to write an exploit string knowing the exact starting address of {\tt
+buf} and the exact saved value of \verb@%ebp@.  If you tried to use
+such an exploit on a normal program, you would find that it works some
+times, but it causes segmentation faults at other times.  Hence the
+name ``dynamite''---an explosive developed by Alfred Nobel that
+contains stabilizing elements to make it less prone to unexpected
+explosions.
+
+For this level, we have gone the opposite direction, making the stack
+positions even less stable than they normally are.  Hence the name
+``nitroglycerin''---an explosive that is notoriously unstable.
+
+When you run {\sc bufbomb} with the command line flag ``{\tt -n},'' it
+will run in ``Nitro'' mode.  Rather than calling the function {\tt
+getbuf}, the program calls a slightly different function {\tt
+getbufn}:
+
+\begin{ccode}
+\input kaboom-c
+\end{ccode}
+
+This function is similar to {\tt getbuf}, except that it has a buffer
+of 512 characters.  You will need this additional space to create a
+reliable exploit.  The code that calls {\tt getbufn} first allocates a
+random amount of storage on the stack (using library function {\tt
+alloca}) that ranges between 0 and 127 bytes.  Thus, if you were to
+sample the value of \verb@%ebp@ during two successive executions of
+{\tt getbufn}, you would find they differ by as much as $\pm 127$.
+
+In addition, when run in Nitro mode, {\sc bufbomb} requires you to
+supply your string 5 times, and it will execute {\tt getbufn} 5 times,
+each with a different stack offset.  Your exploit string must make it
+return your cookie each of these times.
+
+Your task is identical to the task for the Dynamite level. Once again,
+your job for this level is to supply an exploit string that will cause
+\texttt{getbufn} to return your cookie back to test, rather than the value 1.
+You can see in the code for test that this will cause the program to go
+``{\tt KABOOM!}.'' Your exploit code should set your cookie as the return
+value, restore any corrupted state, push the correct return location on
+the stack, and execute a \verb@ret@ instruction to really return to
+{\tt testn}.
+
+{\bf Some Advice}:
+\begin{itemize}
+\item You can use the program {\sc sendstring} to send multiple copies
+of your exploit string. 
+ If you have a single copy in the file {\tt exploit.txt}, then you can 
+use the following command:
+
+\begin{tty}
+unix>{\em cat exploit.txt | ./sendstring -n 5 | ./bufbomb -n -t bovik}
+\end{tty}
+
+You must use the same string for all 5 executions of {\tt getbufn}.
+Otherwise it will fail the testing code used by our grading server.
+
+\item
+The trick is to make use of the {\tt nop} instruction.  It is encoded with
+a single byte (code {\tt 0x90}).  You can place a long sequence of
+these at the beginning of your exploit code so that your code will work
+correctly if the initial jump lands anywhere within the sequence.
+
+\item
+You will need to restore the saved value of \verb@%ebp@ in a way that
+is insensitive to variations in stack positions.
+
+\end{itemize}
+
+\section*{Logistical Notes}
+
+Hand in occurs automatically whenever you correctly solve a level.
+The program sends email to our grading server containing your team
+name (be sure to set the ``{\tt -t}'' command line flag properly) and
+your exploit string to the grading server.  You will be informed of
+this by {\sc bufbomb}.  Upon receiving the email, the server will
+validate your string and update the lab web page.  You should check
+this page a few minutes after your submission to make sure your string
+has been validated.  [If you really solved the level, your string {\em
+should} be valid.]
+
+Note that each level is graded individually.  You do not need to do
+them in the specified order, but you will get credit only for the
+levels for which the server receives a valid message.
+
+Have fun!
+
+\section*{Generating Byte Codes}
+
+Using {\sc gcc} as an assembler and {\sc objdump} as a disassembler
+makes it convenient to generate the byte codes for instruction sequences.
+For example, suppose we write a file \verb@example.s@ containing the
+following assembly code:
+\begin{tty}
+\input{example.s}
+\end{tty}
+The code can contain a mixture of instructions and data.
+Anything to the right of a `\verb@#@' character is a comment.  
+We have
+added an extra word of all 0s to work around a shortcoming in {\sc
+objdump} to be described shortly.
+
+We can now assemble and disassemble this file:
+\begin{tty}
+unix>{\em gcc -c example.s}
+unix>{\em objdump -d example.o > example.d}
+\end{tty}
+The generated file {\tt example.d} contains the following lines
+\begin{ccode}
+\input{example-d}
+\end{ccode}
+Each line shows a single instruction.  The number on the left
+indicates the starting address (starting with 0), while the hex digits
+after the `\verb@:@' character indicate the byte codes for the
+instruction.  Thus, we can see that the instruction {\tt pushl
+\$0x89ABCDEF} has hex-formatted byte code {\tt 68 ef cd ab 89}.
+
+Starting at address 8, the disassembler gets confused.  It tries to
+interpret the bytes in the file {\tt example.o} as instructions, but
+these bytes actually correspond to data.  Note, however, that if we
+read off the 4 bytes starting at address 8 we get: {\tt 98 ba dc fe}.
+This is a byte-reversed version of the data word {\tt 0xFEDCBA98}.
+This byte reversal represents the proper way to supply the bytes as a
+string, since a little endian machine lists the least significant byte
+first.  Note also that it only generated two of the four bytes at the end with
+value {\tt 00}.  Had we not added this padding, {\sc objdump} gets
+even more confused and does not emit all of the bytes we want.
+
+Finally, we can read off the byte sequence for our code (omitting the
+final 0's) as:
+\begin{tty}
+\input{example.txt}
+\end{tty}
+\end{document}

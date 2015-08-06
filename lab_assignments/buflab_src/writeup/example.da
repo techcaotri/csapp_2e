@@ -1,0 +1,13 @@
+
+example.o:     file format elf32-i386
+
+Disassembly of section .text:
+
+00000000 <.text>:
+/* $begin example-d 7 */
+   0:	68 ef cd ab 89       	push   $0x89abcdef
+   5:	83 c0 11             	add    $0x11,%eax
+   8:	98                   	cwtl   	            # Objdump tries to interpret
+   9:	ba dc fe 00 00       	mov    $0xfedc,%edx # these as instructions
+/* $end example-d 7 */
+	...
